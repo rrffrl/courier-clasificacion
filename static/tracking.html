@@ -1,0 +1,205 @@
+<!doctype html>
+<!-- denvio tracking paquetes -->
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Tracking OlvaCourier</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-2xl" id="app">
+            <div class="text-center mb-8">
+                <h1 class="text-2xl font-bold text-gray-800">
+                    Estado de paquetes
+                </h1>
+            </div>
+
+            <h2 class="text-lg font-semibold mb-4">Buscar envío</h2>
+
+            <form id="searchForm" class="flex gap-2 mb-6">
+                <input
+                    type="text"
+                    id="searchInput"
+                    placeholder="N° de envío o código de tracking PAQ-123"
+                    required
+                    class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                    type="submit"
+                    class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                >
+                    Buscar
+                </button>
+            </form>
+
+            <div id="result" class="hidden"></div>
+
+            <div
+                id="error"
+                class="hidden bg-red-50 border border-red-200 text-red-700 rounded-lg p-4"
+            ></div>
+        </div>
+
+        <script>
+            const form = document.getElementById("searchForm");
+            const input = document.getElementById("searchInput");
+            const result = document.getElementById("result");
+            const error = document.getElementById("error");
+
+            form.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                error.classList.add("hidden");
+                result.classList.add("hidden");
+
+                const q = input.value.trim();
+                if (!q) return;
+
+                try {
+                    form.style.display = "none";
+                    if (/^\d+$/.test(q)) {
+                        // denvio - tracking
+                        const res = await fetch(`/envio/${q}`);
+                        if (!res.ok) {
+                            const msg =
+                                res.status === 404
+                                    ? "Envío no encontrado"
+                                    : "Error del servidor";
+                            form.style.display = "flex";
+                            throw new Error(msg);
+                        }
+                        const data = await res.json();
+                        form.style.display = "flex";
+                        renderEnvio(data, q);
+                    } else {
+                        // paquetes
+                        const res = await fetch(
+                            `/paquete/${encodeURIComponent(q)}`,
+                        );
+                        if (!res.ok) {
+                            const msg =
+                                res.status === 404
+                                    ? "Paquete no encontrado"
+                                    : "Error del servidor";
+                            throw new Error(msg);
+                        }
+                        const data = await res.json();
+                        renderPaquete(data);
+                    }
+                } catch (err) {
+                    error.textContent = err.message;
+                    error.classList.remove("hidden");
+                }
+            });
+
+            function estadoClass(estado) {
+                const map = {
+                    RECOGIDO: "bg-blue-100 text-blue-800",
+                    "EN OFICINA": "bg-yellow-100 text-yellow-800",
+                    EN_RUTA: "bg-yellow-100 text-yellow-800",
+                    "EN RUTA DE ENTREGA": "bg-orange-100 text-orange-800",
+                    ENTREGADO: "bg-green-100 text-green-800",
+                    REGISTRADO: "bg-gray-100 text-gray-800",
+                };
+                return map[estado] || "bg-gray-100 text-gray-800";
+            }
+
+            function renderEnvio(data, idenvio) {
+                const paqRows = data.paquetes
+                    .map(
+                        (p) => `
+                          <tr>
+                          <td class="px-4 py-2">${p.descripcion ?? ""}</td>
+                          <td class="px-4 py-2">${p.largo ?? ""}</td>
+                          <td class="px-4 py-2">${p.ancho ?? ""}</td>
+                          <td class="px-4 py-2">${p.alto ?? ""}</td>
+                          <td class="px-4 py-2">${p.peso ?? ""}</td>
+                          <td class="px-4 py-2">${p.valor ?? ""}</td>
+                          </tr>
+                          `,
+                    )
+                    .join("");
+
+                const trkRows = data.tracking
+                    .map(
+                        (t) => `
+              <tr>
+                <td class="px-4 py-2">${(t.fecreg || "").slice(0, 19)}</td>
+                <td class="px-4 py-2"><span class="inline-block px-2 py-0.5 rounded text-xs font-medium ${estadoClass(t.estado)}">${t.estado}</span></td>
+                <td class="px-4 py-2">${t.tiposervicio ?? ""}</td>
+                <td class="px-4 py-2">${t.fecentrega ? (t.fecentrega + "").slice(0, 19) : ""}</td>
+                <td class="px-4 py-2">${t.vehiculo_placa ?? ""}</td>
+                <td class="px-4 py-2">${t.conductor_nombre ?? ""}</td>
+              </tr>
+            `,
+                    )
+                    .join("");
+
+                const lastEstado =
+                    data.tracking.length > 0
+                        ? data.tracking[data.tracking.length - 1].estado
+                        : null;
+
+                const needsRoute =
+                    lastEstado && !["ENTREGADO"].includes(lastEstado);
+
+                result.innerHTML = `
+                      <div class="bg-white rounded-lg shadow-sm border p-6 mb-4">
+                      <h2 class="text-lg font-semibold mb-3">Paquetes</h2>
+                      <div class="overflow-x-auto">
+                      <table class="w-full text-sm">
+                      <thead><tr class="text-left text-gray-500 border-b">
+                      <th class="px-4 py-2">Descripción</th>
+                      <th class="px-4 py-2">Largo</th><th class="px-4 py-2">Ancho</th><th class="px-4 py-2">Alto</th>
+                      <th class="px-4 py-2">Peso</th><th class="px-4 py-2">Valor</th>
+                      </tr></thead>
+                      <tbody>${paqRows}</tbody>
+                      </table>
+                      </div>
+                      </div>
+                      <div class="bg-white rounded-lg shadow-sm border p-6 mb-4">
+                      <h2 class="text-lg font-semibold mb-3">Tracking</h2>
+                      <div class="overflow-x-auto">
+                      <table class="w-full text-sm">
+                      <thead><tr class="text-left text-gray-500 border-b">
+                      <th class="px-4 py-2">Fecha</th><th class="px-4 py-2">Estado</th><th class="px-4 py-2">Servicio</th><th class="px-4 py-2">Entrega</th><th class="px-4 py-2">Vehículo</th><th class="px-4 py-2">Conductor</th>
+                      </tr></thead>
+                      <tbody>${trkRows}</tbody>
+                      </table>
+                      </div>
+                      </div>
+                      ${
+                          needsRoute
+                              ? `
+                      <a href="/clas?idenvio=${idenvio}">
+                      <button class="w-full px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                      Clasificar / Asignar ruta
+                      </button>
+                      </a>`
+                              : ""
+                      }
+                      `;
+                result.classList.remove("hidden");
+            }
+
+            function renderPaquete(p) {
+                result.innerHTML = `
+                      <div class="bg-white rounded-lg shadow-sm border p-6">
+                      <h2 class="text-lg font-semibold mb-4">Detalle del Paquete</h2>
+                      <dl class="grid grid-cols-2 gap-3 text-sm">
+                      <dt class="text-gray-500">Código de tracking</dt>
+                      <dd class="font-medium">${p.tracking_code}</dd>
+                      <dt class="text-gray-500">Destinatario</dt>
+                      <dd class="font-medium">${p.destinatario ?? ""}</dd>
+                      <dt class="text-gray-500">Dirección</dt>
+                      <dd class="font-medium">${p.direccion ?? ""}</dd>
+                      <dt class="text-gray-500">Estado actual</dt>
+                      <dd class="font-medium"><span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">${p.estado_actual ?? ""}</span></dd>
+                      </dl>
+                      </div>
+                      `;
+                result.classList.remove("hidden");
+            }
+        </script>
+    </body>
+</html>

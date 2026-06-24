@@ -1,0 +1,293 @@
+<!doctype html>
+<!-- destinos ruta vehículo denvio tracking envio -->
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Clasificación - OlvaCourier</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-gray-50 min-h-screen p-6">
+        <div class="max-w-4xl mx-auto">
+            <div class="text-center mb-8">
+                <h1 class="text-2xl font-bold text-gray-800">
+                    Clasificación de Envíos
+                </h1>
+                <p class="text-gray-500">Asigna destino al envío</p>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border p-6 mb-6">
+                <h2 class="text-lg font-semibold mb-4">Buscar envío</h2>
+                <form id="searchForm" class="flex gap-2">
+                    <input
+                        type="text"
+                        id="idenvio"
+                        placeholder="Número de envío"
+                        required
+                        class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                        type="submit"
+                        class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                    >
+                        Buscar
+                    </button>
+                </form>
+            </div>
+
+            <div
+                id="envioInfo"
+                class="hidden bg-white rounded-lg shadow-sm border p-6 mb-6"
+            >
+                <h2 class="text-lg font-semibold mb-3">
+                    Envío #<span id="envioNum"></span>
+                </h2>
+                <div
+                    id="paquetesResumen"
+                    class="text-sm text-gray-600 mb-4"
+                ></div>
+            </div>
+
+            <div
+                id="formSection"
+                class="hidden bg-white rounded-lg shadow-sm border p-6 mb-6"
+            >
+                <h2 class="text-lg font-semibold mb-4">Clasificar</h2>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1"
+                        >Tipo de destino</label
+                    >
+                    <div class="flex gap-4">
+                        <label
+                            class="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50"
+                        >
+                            <input
+                                type="radio"
+                                name="tipo_destino"
+                                value="Local"
+                                checked
+                            />
+                            <span>Local</span>
+                        </label>
+                        <label
+                            class="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50"
+                        >
+                            <input
+                                type="radio"
+                                name="tipo_destino"
+                                value="Nacional"
+                            />
+                            <span>Nacional</span>
+                        </label>
+                        <label
+                            class="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50"
+                        >
+                            <input
+                                type="radio"
+                                name="tipo_destino"
+                                value="Internacional"
+                            />
+                            <span>Internacional</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label
+                        for="destino"
+                        class="block text-sm font-medium text-gray-700 mb-1"
+                        >Destino</label
+                    >
+                    <select
+                        id="destino"
+                        required
+                        class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="">Seleccionar destino...</option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label
+                        for="ruta"
+                        class="block text-sm font-medium text-gray-700 mb-1"
+                        >Ruta / Vehículo</label
+                    >
+                    <select
+                        id="ruta"
+                        class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="">Sin ruta asignada</option>
+                    </select>
+                </div>
+
+                <button
+                    id="saveBtn"
+                    class="w-full px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                >
+                    Guardar clasificación
+                </button>
+            </div>
+
+            <div class="text-center mt-4">
+                <a href="/rutas" class="text-sm text-blue-600 hover:underline"
+                    >Ver rutas y destinos</a
+                >
+            </div>
+
+            <div
+                id="error"
+                class="hidden bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-6"
+            ></div>
+            <div
+                id="success"
+                class="hidden bg-green-50 border border-green-200 text-green-700 rounded-lg p-4 mb-6"
+            ></div>
+        </div>
+
+        <script>
+            let currentIdenvio = null;
+            const destinoSelect = document.getElementById("destino");
+            const rutaSelect = document.getElementById("ruta");
+
+            // destinos
+            fetch("/destinos")
+                .then((r) => r.json())
+                .then((destinos) => {
+                    destinos.forEach((d) => {
+                        const opt = document.createElement("option");
+                        opt.value = d.iddestino;
+                        opt.textContent = d.nombredestino;
+                        destinoSelect.appendChild(opt);
+                    });
+                });
+
+            // ruta  vehiculo
+            fetch("/rutas-disponibles")
+                .then((r) => r.json())
+                .then((rutas) => {
+                    rutas.forEach((rt) => {
+                        const opt = document.createElement("option");
+                        opt.value = rt.idruta;
+                        opt.textContent = `Ruta ${rt.rutacol} - ${rt.placa || "sin vehículo"} (${(rt.fecoperacion || "").slice(0, 10)})`;
+                        rutaSelect.appendChild(opt);
+                    });
+                });
+
+            document
+                .getElementById("searchForm")
+                .addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    hideMessages();
+
+                    const id = document.getElementById("idenvio").value.trim();
+                    if (!id) return;
+
+                    try {
+                        // denvio tracking
+                        const res = await fetch(`/envio/${id}`);
+                        if (!res.ok)
+                            throw new Error(
+                                res.status === 404
+                                    ? "Envío no encontrado"
+                                    : "Error del servidor",
+                            );
+                        const data = await res.json();
+
+                        currentIdenvio = id;
+                        document.getElementById("envioNum").textContent = id;
+
+                        const paqInfo = data.paquetes
+                            .map(
+                                (p) =>
+                                    `${p.descripcion || "Sin descripción"} (${p.peso || "?"} kg)`,
+                            )
+                            .join("<br>");
+                        document.getElementById("paquetesResumen").innerHTML =
+                            `<strong>Paquetes:</strong><br>${paqInfo}`;
+
+                        document
+                            .getElementById("envioInfo")
+                            .classList.remove("hidden");
+                        document
+                            .getElementById("formSection")
+                            .classList.remove("hidden");
+                    } catch (err) {
+                        showError(err.message);
+                    }
+                });
+
+            document
+                .getElementById("saveBtn")
+                .addEventListener("click", async () => {
+                    const tipo_destino = document.querySelector(
+                        'input[name="tipo_destino"]:checked',
+                    ).value;
+                    const iddestino = destinoSelect.value;
+
+                    if (!iddestino) {
+                        showError("Selecciona un destino");
+                        return;
+                    }
+
+                    const btn = document.getElementById("saveBtn");
+                    btn.disabled = true;
+
+                    try {
+                        const idruta = rutaSelect.value;
+                        const res = await fetch(
+                            // envio - ruta - tracking
+                            `/envio/${currentIdenvio}/clasificar`,
+                            {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    tipo_destino,
+                                    iddestino: parseInt(iddestino),
+                                    idruta: idruta ? parseInt(idruta) : null,
+                                }),
+                            },
+                        );
+
+                        if (!res.ok) {
+                            const err = await res.json();
+                            throw new Error(
+                                err.detail || "Error al clasificar",
+                            );
+                        }
+
+                        showSuccess("Clasificación guardada correctamente");
+                    } catch (err) {
+                        showError(err.message);
+                    } finally {
+                        btn.disabled = false;
+                    }
+                });
+
+            function showError(msg) {
+                const el = document.getElementById("error");
+                el.textContent = msg;
+                el.classList.remove("hidden");
+            }
+
+            function showSuccess(msg) {
+                const el = document.getElementById("success");
+                el.textContent = msg;
+                el.classList.remove("hidden");
+            }
+
+            function hideMessages() {
+                document.getElementById("error").classList.add("hidden");
+                document.getElementById("success").classList.add("hidden");
+            }
+
+            const params = new URLSearchParams(window.location.search);
+            const idenvioParam = params.get("idenvio");
+            if (idenvioParam) {
+                document.getElementById("idenvio").value = idenvioParam;
+                document.getElementById("searchForm").requestSubmit();
+            }
+        </script>
+    </body>
+</html>

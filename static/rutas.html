@@ -1,0 +1,155 @@
+<!doctype html>
+<!-- ruta  -->
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Rutas - OlvaCourier</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            .modal-backdrop {
+                background: rgba(0, 0, 0, 0.5);
+            }
+        </style>
+    </head>
+    <body class="bg-gray-50 min-h-screen p-6">
+        <div class="max-w-5xl mx-auto">
+            <div class="text-center mb-8">
+                <h1 class="text-2xl font-bold text-gray-800">Rutas</h1>
+                <p class="text-gray-500">
+                    Paquetes agrupados por ruta asignada
+                </p>
+            </div>
+
+            <div
+                id="content"
+                class="grid grid-cols-1 md:grid-cols-2 gap-4"
+            ></div>
+        </div>
+
+        <div
+            id="modal"
+            class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop"
+        >
+            <div
+                class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col"
+            >
+                <div class="flex items-center justify-between p-4 border-b">
+                    <h2 class="text-lg font-semibold" id="modalTitle">
+                        Paquetes
+                    </h2>
+                    <button
+                        onclick="closeModal()"
+                        class="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+                    >
+                        &times;
+                    </button>
+                </div>
+                <div class="overflow-auto p-4 flex-1" id="modalBody"></div>
+            </div>
+        </div>
+
+        <script>
+            function estadoBadge(estado) {
+                const map = {
+                    Activa: "bg-green-100 text-green-800",
+                    "En ejecuci\u00f3n": "bg-blue-100 text-blue-800",
+                    Completada: "bg-gray-100 text-gray-800",
+                    Finalizado: "bg-gray-100 text-gray-800",
+                    Programada: "bg-yellow-100 text-yellow-800",
+                    Programado: "bg-yellow-100 text-yellow-800",
+                };
+                const cls = map[estado] || "bg-gray-100 text-gray-800";
+                return `<span class="inline-block px-2 py-0.5 rounded text-xs font-medium ${cls}">${estado}</span>`;
+            }
+
+            const maxEnvios = 50;
+
+            // ruta vehiculo envio  destinos
+            fetch("/rutas/resumen")
+                .then((r) => r.json())
+                .then((data) => {
+                    const container = document.getElementById("content");
+                    data.forEach((item) => {
+                        if (item.total_envios > 0) {
+                            const pct = Math.round(
+                                (item.total_envios / maxEnvios) * 100,
+                            );
+                            const barColor =
+                                pct > 60
+                                    ? "bg-green-500"
+                                    : pct > 30
+                                      ? "bg-yellow-500"
+                                      : "bg-blue-500";
+                            const card = document.createElement("div");
+                            card.className =
+                                "bg-white rounded-lg shadow-sm border p-5 cursor-pointer hover:shadow-md transition";
+                            card.innerHTML = `
+              <div class="flex items-center justify-between mb-2">
+                <div>
+                  <h2 class="text-lg font-semibold">${item.rutacol}</h2>
+                  <p class="text-xs text-gray-400">${item.fecoperacion} ${item.horainicio} | ${item.vehiculo} | ${item.kilometros} km</p>
+                </div>
+                <div class="text-right">
+                  <span class="text-2xl font-bold text-gray-700">${item.total_envios}</span>
+                  <div class="mt-1">${estadoBadge(item.estado)}</div>
+                </div>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full h-3 mb-1">
+                <div class="${barColor} h-3 rounded-full transition-all" style="width:${Math.min(pct, 100)}%"></div>
+              </div>
+              <div class="text-xs text-gray-400">${item.total_envios} env\u00edos</div>
+            `;
+                            card.onclick = () => abrirModal(item);
+                            container.appendChild(card);
+                        }
+                        // rutas con nombres repetidos
+                        // else
+                        //     console.log(
+                        //         `${item.rutacol} - ${item.total_envios}`,
+                        //     );
+                    });
+                });
+
+            function abrirModal(route) {
+                const body = document.getElementById("modalBody");
+                document.getElementById("modalTitle").textContent =
+                    `Paquetes — ${route.rutacol}`;
+                document.getElementById("modal").classList.remove("hidden");
+
+                if (!route.envios || !route.envios.length) {
+                    body.innerHTML =
+                        '<p class="text-gray-500">No hay paquetes asignados a esta ruta.</p>';
+                    return;
+                }
+
+                body.innerHTML = `
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-gray-500 border-b">
+            <th class="px-3 py-2">Envío</th><th class="px-3 py-2">Destino</th>
+          </tr></thead>
+          <tbody>${route.envios
+              .map(
+                  (e) => `
+            <tr class="border-b hover:bg-gray-50">
+              <td class="px-3 py-2">${e.idenvio}</td>
+              <td class="px-3 py-2">${e.destino}</td>
+            </tr>`,
+              )
+              .join("")}</tbody>
+        </table>`;
+            }
+
+            function closeModal() {
+                document.getElementById("modal").classList.add("hidden");
+            }
+
+            document.getElementById("modal").addEventListener("click", (e) => {
+                if (e.target === e.currentTarget) closeModal();
+            });
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "Escape") closeModal();
+            });
+        </script>
+    </body>
+</html>
